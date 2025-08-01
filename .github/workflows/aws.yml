@@ -28,6 +28,12 @@
 name: Deploy to Amazon ECS
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'CD'
+        required: true
+        default: 'dev'
   push:
     branches: [ "main" ]
 
