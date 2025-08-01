@@ -14,42 +14,55 @@ on:
 
 env:
   AWS_REGION: us-east-2                  # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: dev/github-action          # set this to your Amazon ECR repository name
-  ECS_SERVICE: ecs_service               # set this to your Amazon ECS service name
-  ECS_CLUSTER: ecs_cluster                 # set this to your Amazon ECS cluster name
-#  ECS_TASK_DEFINITION: ecs_task_definition # set this to the path to your Amazon ECS task definition
-                                               # file, e.g. .aws/task-definition.json
-  CONTAINER_NAME: ecs         
+  ECR_REPOSITORY: dev/github-action          # set this to your Amazon ECR repository name      
+  CLUSTER: ecs_cluster
+  SERVICE: ecs_service
+  TASK_DEFINITION_NAME: ecs_task_definition
+  CONTAINER_NAME: ecs
+  IMAGE_URI: 480314816866.dkr.ecr.us-east-2.amazonaws.com/dev/github-action:demo-app
                                                
 
 
 jobs:
   deploy:
-    name: Deploy
     runs-on: ubuntu-latest
-    environment: dev
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      - name: Download existing task definition
+        id: get-task
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition $TASK_DEFINITION_NAME \
+            --query 'taskDefinition' \
+            > task-definition.json
 
+      - name: Update image in task definition
+        id: render
+        run: |
+          cat task-definition.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+          | jq --arg IMAGE "$IMAGE_URI" --arg CONTAINER "$CONTAINER_NAME" \
+            '.containerDefinitions |= map(if .name == $CONTAINER then .image = $IMAGE else . end)' \
+          > new-task-def.json
 
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-update-service@v1
-  #    uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: arn:aws:ecs:us-east-2:480314816866:task-definition/ecs_task_definition:1
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
+      - name: Register new task definition
+        id: register
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEF_ARN }}
+          service: ${{ env.SERVICE }}
+          cluster: ${{ env.CLUSTER }}
