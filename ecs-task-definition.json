@@ -1,7 +1,0 @@
-- name: Render ECS Task Definition
-  id: render-task-def
-  uses: aws-actions/amazon-ecs-render-task-definition@v1
-  with:
-    task-definition: ecs-task-definition.json
-    container-name: ecs
-    image: 480314816866.dkr.ecr.us-east-2.amazonaws.com/dev/github-action:demo-app
