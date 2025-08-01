@@ -17,7 +17,7 @@ env:
   ECR_REPOSITORY: dev/github-action          # set this to your Amazon ECR repository name
   ECS_SERVICE: ecs_service               # set this to your Amazon ECS service name
   ECS_CLUSTER: ecs_cluster                 # set this to your Amazon ECS cluster name
-  ECS_TASK_DEFINITION: ecs_task_definition # set this to the path to your Amazon ECS task definition
+#  ECS_TASK_DEFINITION: ecs_task_definition # set this to the path to your Amazon ECS task definition
                                                # file, e.g. .aws/task-definition.json
   CONTAINER_NAME: ecs         
                                                
@@ -51,4 +51,4 @@ jobs:
         task-definition: arn:aws:ecs:us-east-2:480314816866:task-definition/ecs_task_definition:1
         service: ${{ env.ECS_SERVICE }}
         cluster: ${{ env.ECS_CLUSTER }}
-#        wait-for-service-stability: true
+        wait-for-service-stability: true
